@@ -1,39 +1,42 @@
-# ChatBot CoreMind
+# 🤖 ChatBot CoreMind
 
-Um chatbot interativo construído com Streamlit e OpenAI GPT-3.5.
+Um chatbot inteligente construído com Streamlit e Google Gemini API.
 
-## Requisitos
+## 🔐 Configuração Segura
 
-- Python 3.8 ou superior
-- Conta na OpenAI com acesso à API
+Para configurar o projeto de forma segura, siga estes passos:
 
-## Instalação
-
-1. Clone este repositório
-2. Instale as dependências:
+1. Instale as dependências:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Crie um arquivo `.env` na raiz do projeto e adicione sua chave API da OpenAI:
-```
-OPENAI_API_KEY=sua_chave_api_aqui
+2. Execute o script de criptografia para gerar as configurações seguras:
+```bash
+python encrypt_key.py
 ```
 
-## Como executar
+3. Crie um arquivo `.env` na raiz do projeto e adicione as configurações geradas pelo script.
 
-Execute o seguinte comando no terminal:
+4. Compartilhe a senha de criptografia (`ENCRYPTION_PASSWORD`) de forma segura com sua equipe.
+
+## ⚠️ Importante
+
+- Nunca compartilhe o arquivo `.env`
+- Nunca compartilhe a chave API original
+- Mantenha a senha de criptografia em um local seguro
+- O arquivo `.env` está no `.gitignore` por segurança
+
+## 🚀 Executando o Projeto
+
 ```bash
 streamlit run app.py
 ```
 
-O chatbot estará disponível em `http://localhost:8501`
+## 📝 Estrutura do Projeto
 
-## Funcionalidades
-
-- Interface amigável com Streamlit
-- Histórico de conversas
-- Botão para limpar o chat
-- Integração com GPT-3.5
-- Tratamento de erros
-- Design responsivo 
+- `app.py`: Aplicação principal do chatbot
+- `crypto_utils.py`: Utilitários de criptografia
+- `encrypt_key.py`: Script para criptografar a chave API
+- `.env`: Arquivo de configuração (não versionado)
+- `requirements.txt`: Dependências do projeto 
