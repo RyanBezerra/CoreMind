@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import json
 
-API_KEY = "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"
+API_KEY = "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"
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 st.set_page_config(
@@ -18,16 +18,16 @@ st.markdown("""
 """)
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [
+    st.session_state["messages"] = [
         {"role": "system", "content": "Você é um assistente virtual que deve responder APENAS em português do Brasil (pt-BR). Use linguagem formal mas amigável, e mantenha suas respostas claras e objetivas."}
     ]
 
-for message in st.session_state.messages:
+for message in st.session_state["messages"]:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
 if prompt := st.chat_input("Digite sua mensagem aqui..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.session_state["messages"].append({"role": "user", "content": prompt})
     
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -45,7 +45,7 @@ if prompt := st.chat_input("Digite sua mensagem aqui..."):
                 "model": "deepseek/deepseek-r1-0528-qwen3-8b:free",
                 "messages": [
                     {"role": m["role"], "content": m["content"]}
-                    for m in st.session_state.messages
+                    for m in st.session_state["messages"]
                 ],
                 "temperature": 0.7,
                 "max_tokens": 2000
@@ -70,7 +70,7 @@ if prompt := st.chat_input("Digite sua mensagem aqui..."):
                     st.markdown(assistant_response)
                     
                     # Adicionar resposta do assistente ao histórico
-                    st.session_state.messages.append({"role": "assistant", "content": assistant_response})
+                    st.session_state["messages"].append({"role": "assistant", "content": assistant_response})
                 else:
                     st.error("Resposta inesperada da API")
                     st.json(response_data)
@@ -84,5 +84,5 @@ if prompt := st.chat_input("Digite sua mensagem aqui..."):
             st.info("Por favor, verifique se a chave API está correta e se o serviço está disponível.")
 
 if st.button("Limpar Chat"):
-    st.session_state.messages = []
+    st.session_state["messages"] = []
     st.rerun() 
