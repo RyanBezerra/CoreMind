@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'tela_conversa.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class TelaSalvos extends StatefulWidget {
   const TelaSalvos({super.key});
@@ -14,26 +16,14 @@ class _TelaSalvosState extends State<TelaSalvos> with SingleTickerProviderStateM
   late Animation<Offset> _animacaoSlide;
   String _categoriaSelecionada = 'Todas';
 
-  final List<Map<String, dynamic>> _conversasSalvas = [
-    {
-      'titulo': 'Flutter - Dicas de Desenvolvimento',
-      'ultimaMensagem': 'Aqui estão algumas dicas para melhorar seu código Flutter...',
-      'data': DateTime.now().subtract(const Duration(hours: 2)),
-      'categoria': 'Desenvolvimento',
-    },
-    {
-      'titulo': 'UI/UX - Melhores Práticas',
-      'ultimaMensagem': 'Para criar interfaces mais intuitivas, considere...',
-      'data': DateTime.now().subtract(const Duration(days: 1)),
-      'categoria': 'Design',
-    },
-    {
-      'titulo': 'Integração com APIs',
-      'ultimaMensagem': 'Para integrar APIs de forma eficiente...',
-      'data': DateTime.now().subtract(const Duration(days: 2)),
-      'categoria': 'Desenvolvimento',
-    },
+  final List<Map<String, dynamic>> _conversasSalvas = [];
+
+  // Lista de todas as categorias/tags disponíveis
+  final List<String> todasCategorias = [
+    'Desenvolvimento', 'Projetos', 'Ajudas', 'Negócios', 'Outros',
   ];
+
+  final ScrollController _scrollControllerConversas = ScrollController();
 
   @override
   void initState() {
@@ -58,10 +48,41 @@ class _TelaSalvosState extends State<TelaSalvos> with SingleTickerProviderStateM
       ),
     );
     _animacaoController.forward();
+    _carregarConversasSalvas();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _carregarConversasSalvas();
+  }
+
+  Future<void> _carregarConversasSalvas() async {
+    final prefs = await SharedPreferences.getInstance();
+    final conversas = prefs.getStringList('conversas_salvas') ?? [];
+    print('Conversas lidas do shared_preferences: ' + conversas.toString());
+    setState(() {
+      _conversasSalvas.clear();
+      for (var conversaStr in conversas) {
+        final map = _converterStringParaMap(conversaStr);
+        if (map != null) {
+          _conversasSalvas.add(map);
+        }
+      }
+    });
+  }
+
+  Map<String, dynamic>? _converterStringParaMap(String str) {
+    try {
+      return json.decode(str);
+    } catch (e) {
+      return null;
+    }
   }
 
   @override
   void dispose() {
+    _scrollControllerConversas.dispose();
     _animacaoController.dispose();
     super.dispose();
   }
@@ -70,7 +91,7 @@ class _TelaSalvosState extends State<TelaSalvos> with SingleTickerProviderStateM
     if (_categoriaSelecionada == 'Todas') {
       return _conversasSalvas;
     }
-    return _conversasSalvas.where((conversa) => conversa['categoria'] == _categoriaSelecionada).toList();
+    return _conversasSalvas.where((conversa) => (conversa['categorias'] ?? ['Geral']).contains(_categoriaSelecionada)).toList();
   }
 
   String _formatarData(DateTime data) {
@@ -91,6 +112,7 @@ class _TelaSalvosState extends State<TelaSalvos> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     final conversasFiltradas = _filtrarConversas();
+    print('Conversas filtradas para exibição: ' + conversasFiltradas.toString());
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -113,19 +135,26 @@ class _TelaSalvosState extends State<TelaSalvos> with SingleTickerProviderStateM
         children: [
           _construirFiltros(),
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: conversasFiltradas.length,
-              itemBuilder: (context, index) {
-                final conversa = conversasFiltradas[index];
-                return SlideTransition(
-                  position: _animacaoSlide,
-                  child: FadeTransition(
-                    opacity: _animacaoFade,
-                    child: _construirItemConversa(conversa),
-                  ),
-                );
-              },
+            child: Scrollbar(
+              controller: _scrollControllerConversas,
+              thumbVisibility: true,
+              trackVisibility: true,
+              interactive: true,
+              child: ListView.builder(
+                controller: _scrollControllerConversas,
+                padding: const EdgeInsets.all(16.0),
+                itemCount: conversasFiltradas.length,
+                itemBuilder: (context, index) {
+                  final conversa = conversasFiltradas[index];
+                  return SlideTransition(
+                    position: _animacaoSlide,
+                    child: FadeTransition(
+                      opacity: _animacaoFade,
+                      child: _construirItemConversa(conversa),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ],
@@ -134,41 +163,46 @@ class _TelaSalvosState extends State<TelaSalvos> with SingleTickerProviderStateM
   }
 
   Widget _construirFiltros() {
-    final categorias = ['Todas', 'Desenvolvimento', 'Design', 'Negócios'];
+    final categorias = ['Todas', ...todasCategorias];
 
-    return Container(
+    return SizedBox(
       height: 50.0,
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        itemCount: categorias.length,
-        itemBuilder: (context, index) {
-          final categoria = categorias[index];
-          final selecionada = categoria == _categoriaSelecionada;
+      width: double.infinity,
+      child: Scrollbar(
+        thumbVisibility: true,
+        trackVisibility: true,
+        interactive: true,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          itemCount: categorias.length,
+          itemBuilder: (context, index) {
+            final categoria = categorias[index];
+            final selecionada = categoria == _categoriaSelecionada;
 
-          return Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: ChoiceChip(
-              label: Text(
-                categoria,
-                style: TextStyle(
-                  color: selecionada ? Colors.white : Colors.grey,
+            return Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: ChoiceChip(
+                label: Text(
+                  categoria,
+                  style: TextStyle(
+                    color: selecionada ? Colors.white : Colors.grey,
+                  ),
                 ),
+                selected: selecionada,
+                onSelected: (selecionado) {
+                  if (selecionado) {
+                    setState(() {
+                      _categoriaSelecionada = categoria;
+                    });
+                  }
+                },
+                backgroundColor: Colors.grey[900],
+                selectedColor: Colors.red,
               ),
-              selected: selecionada,
-              onSelected: (selecionado) {
-                if (selecionado) {
-                  setState(() {
-                    _categoriaSelecionada = categoria;
-                  });
-                }
-              },
-              backgroundColor: Colors.grey[900],
-              selectedColor: Colors.red,
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -185,7 +219,7 @@ class _TelaSalvosState extends State<TelaSalvos> with SingleTickerProviderStateM
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const TelaConversa(),
+              builder: (context) => TelaConversa(tituloConversa: conversa['titulo']),
             ),
           );
         },
@@ -209,7 +243,7 @@ class _TelaSalvosState extends State<TelaSalvos> with SingleTickerProviderStateM
                     ),
                   ),
                   Text(
-                    _formatarData(conversa['data']),
+                    _formatarData(DateTime.parse(conversa['data'])),
                     style: TextStyle(
                       color: Colors.grey[400],
                       fontSize: 12.0,
@@ -230,22 +264,28 @@ class _TelaSalvosState extends State<TelaSalvos> with SingleTickerProviderStateM
               const SizedBox(height: 8.0),
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8.0,
-                      vertical: 4.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4.0),
-                    ),
-                    child: Text(
-                      conversa['categoria'],
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 12.0,
+                  for (var cat in (conversa['categorias'] ?? ['Geral']))
+                    Container(
+                      margin: const EdgeInsets.only(right: 4.0),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8.0,
+                        vertical: 4.0,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4.0),
+                      ),
+                      child: Text(
+                        cat,
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 12.0,
+                        ),
                       ),
                     ),
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.red, size: 18),
+                    onPressed: () => _editarCategorias(conversa),
                   ),
                 ],
               ),
@@ -254,5 +294,61 @@ class _TelaSalvosState extends State<TelaSalvos> with SingleTickerProviderStateM
         ),
       ),
     );
+  }
+
+  void _editarCategorias(Map<String, dynamic> conversa) async {
+    final selecionadas = Set<String>.from(conversa['categorias'] ?? []);
+    final resultado = await showDialog<Set<String>>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Editar categorias'),
+          content: SingleChildScrollView(
+            child: Column(
+              children: todasCategorias.map((cat) {
+                return CheckboxListTile(
+                  title: Text(cat),
+                  value: selecionadas.contains(cat),
+                  onChanged: (val) {
+                    if (val == true) {
+                      selecionadas.add(cat);
+                    } else {
+                      selecionadas.remove(cat);
+                    }
+                    (context as Element).markNeedsBuild();
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, null),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, selecionadas),
+              child: const Text('Salvar'),
+            ),
+          ],
+        );
+      },
+    );
+    if (resultado != null && resultado.isNotEmpty) {
+      setState(() {
+        conversa['categorias'] = resultado.toList();
+      });
+      // Atualiza no SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final conversas = prefs.getStringList('conversas_salvas') ?? [];
+      for (int i = 0; i < conversas.length; i++) {
+        final map = jsonDecode(conversas[i]);
+        if (map['titulo'] == conversa['titulo']) {
+          map['categorias'] = resultado.toList();
+          conversas[i] = jsonEncode(map);
+        }
+      }
+      await prefs.setStringList('conversas_salvas', conversas);
+    }
   }
 } 

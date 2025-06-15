@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'services/deepseek_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class TelaConversa extends StatefulWidget {
-  const TelaConversa({super.key});
+  final String? tituloConversa;
+  const TelaConversa({super.key, this.tituloConversa});
 
   @override
   State<TelaConversa> createState() => _TelaConversaState();
@@ -15,6 +19,11 @@ class _TelaConversaState extends State<TelaConversa> with SingleTickerProviderSt
   late Animation<double> _animacaoFade;
   late Animation<Offset> _animacaoSlide;
   final ScrollController _scrollController = ScrollController();
+  final DeepSeekService _deepSeekService = DeepSeekService();
+
+  String get _chaveHistorico => widget.tituloConversa != null
+      ? 'historico_conversa_${widget.tituloConversa}'
+      : 'historico_conversa';
 
   @override
   void initState() {
@@ -39,23 +48,45 @@ class _TelaConversaState extends State<TelaConversa> with SingleTickerProviderSt
       ),
     );
     _animacaoController.forward();
-
-    // Mensagem inicial do assistente
-    _mensagens.add(
-      Mensagem(
-        texto: 'Olá! Sou seu assistente virtual. Como posso ajudar você hoje?',
-        eUsuario: false,
-        timestamp: DateTime.now(),
-      ),
-    );
+    if (widget.tituloConversa != null) {
+      _carregarHistoricoConversa();
+    } else {
+      _salvarEIniciarNovaConversa().then((_) => _carregarHistoricoConversa());
+    }
   }
 
   @override
   void dispose() {
+    _salvarConversaAoSair();
     _controladorTexto.dispose();
     _animacaoController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _salvarConversaAoSair() async {
+    if (widget.tituloConversa != null) return; // Não sobrescreve histórico de conversa salva
+    final prefs = await SharedPreferences.getInstance();
+    final historico = prefs.getStringList('historico_conversa') ?? [];
+    if (historico.isNotEmpty) {
+      String? titulo;
+      String? ultimaMensagem;
+      DateTime? data;
+      for (var msgStr in historico) {
+        final map = jsonDecode(msgStr);
+        if (titulo == null && map['eUsuario'] == true) {
+          titulo = map['texto'];
+        }
+        if (map['eUsuario'] == false) {
+          ultimaMensagem = map['texto'];
+          data = DateTime.parse(map['timestamp']);
+        }
+      }
+      if (titulo != null && ultimaMensagem != null && data != null) {
+        await _salvarConversa(titulo, ultimaMensagem, data);
+        await prefs.setStringList('historico_conversa_$titulo', historico);
+      }
+    }
   }
 
   void _rolarParaBaixo() {
@@ -68,39 +99,156 @@ class _TelaConversaState extends State<TelaConversa> with SingleTickerProviderSt
     }
   }
 
-  void _enviarMensagem() {
+  Future<void> _salvarConversa(String titulo, String ultimaMensagem, DateTime data) async {
+    final prefs = await SharedPreferences.getInstance();
+    final conversas = prefs.getStringList('conversas_salvas') ?? [];
+    List<Map<String, dynamic>> listaConversas = conversas.map((c) => jsonDecode(c) as Map<String, dynamic>).toList();
+
+    // Verifica se já existe uma conversa com o mesmo título
+    final idx = listaConversas.indexWhere((c) => c['titulo'] == titulo);
+    if (idx != -1) {
+      // Atualiza a última mensagem e data
+      listaConversas[idx]['ultimaMensagem'] = ultimaMensagem;
+      listaConversas[idx]['data'] = data.toIso8601String();
+    } else {
+      // Adiciona nova conversa
+      listaConversas.add({
+        'titulo': titulo,
+        'ultimaMensagem': ultimaMensagem,
+        'data': data.toIso8601String(),
+        'categorias': ['Geral'],
+      });
+    }
+    final conversasJson = listaConversas.map((c) => jsonEncode(c)).toList();
+    await prefs.setStringList('conversas_salvas', conversasJson);
+
+    print('Salvando conversa: título=$titulo, últimaMensagem=$ultimaMensagem, data=$data');
+    print('Lista final de conversas: ' + listaConversas.toString());
+  }
+
+  Future<void> _salvarEIniciarNovaConversa() async {
+    final prefs = await SharedPreferences.getInstance();
+    final historico = prefs.getStringList('historico_conversa') ?? [];
+    if (historico.isNotEmpty) {
+      String? titulo;
+      String? ultimaMensagem;
+      DateTime? data;
+      for (var msgStr in historico) {
+        final map = jsonDecode(msgStr);
+        if (titulo == null && map['eUsuario'] == true) {
+          titulo = map['texto'];
+        }
+        if (map['eUsuario'] == false) {
+          ultimaMensagem = map['texto'];
+          data = DateTime.parse(map['timestamp']);
+        }
+      }
+      if (titulo != null && ultimaMensagem != null && data != null) {
+        await _salvarConversa(titulo, ultimaMensagem, data);
+        // Salva o histórico completo dessa conversa
+        await prefs.setStringList('historico_conversa_$titulo', historico);
+      }
+    }
+    await prefs.remove('historico_conversa');
+  }
+
+  Future<void> _salvarHistoricoConversa() async {
+    final prefs = await SharedPreferences.getInstance();
+    final historico = _mensagens.map((m) => jsonEncode({
+      'texto': m.texto,
+      'eUsuario': m.eUsuario,
+      'timestamp': m.timestamp.toIso8601String(),
+    })).toList();
+    await prefs.setStringList(_chaveHistorico, historico);
+  }
+
+  Future<void> _carregarHistoricoConversa() async {
+    final prefs = await SharedPreferences.getInstance();
+    final historico = prefs.getStringList(_chaveHistorico) ?? [];
+    setState(() {
+      _mensagens.clear();
+      for (var msgStr in historico) {
+        final map = jsonDecode(msgStr);
+        _mensagens.add(Mensagem(
+          texto: map['texto'],
+          eUsuario: map['eUsuario'],
+          timestamp: DateTime.parse(map['timestamp']),
+        ));
+      }
+      if (_mensagens.isEmpty) {
+        _mensagens.add(
+          Mensagem(
+            texto: 'Olá! Sou seu assistente virtual. Como posso ajudar você hoje?',
+            eUsuario: false,
+            timestamp: DateTime.now(),
+          ),
+        );
+      }
+    });
+  }
+
+  void _enviarMensagem() async {
     if (_controladorTexto.text.trim().isEmpty) return;
 
+    final mensagemUsuario = _controladorTexto.text;
+    final primeiraMensagem = _mensagens.where((m) => m.eUsuario).isEmpty;
     setState(() {
       _mensagens.add(
         Mensagem(
-          texto: _controladorTexto.text,
+          texto: mensagemUsuario,
           eUsuario: true,
           timestamp: DateTime.now(),
         ),
       );
       _estaDigitando = true;
     });
+    await _salvarHistoricoConversa();
 
     _controladorTexto.clear();
     _rolarParaBaixo();
 
-    // Simular resposta do assistente
-    Future.delayed(const Duration(seconds: 1), () {
+    try {
+      final resposta = await _deepSeekService.sendMessage(
+        mensagemUsuario,
+        _mensagens.where((m) => m.eUsuario || m.eUsuario == false).toList(),
+      );
       if (mounted) {
         setState(() {
           _mensagens.add(
             Mensagem(
-              texto: 'Esta é uma resposta simulada do assistente. Em breve, será integrada com a API de IA.',
+              texto: resposta,
               eUsuario: false,
               timestamp: DateTime.now(),
             ),
           );
           _estaDigitando = false;
         });
+        await _salvarHistoricoConversa();
+        _rolarParaBaixo();
+        if (primeiraMensagem) {
+          await _salvarConversa(
+            mensagemUsuario,
+            resposta,
+            DateTime.now(),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _mensagens.add(
+            Mensagem(
+              texto: 'Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.',
+              eUsuario: false,
+              timestamp: DateTime.now(),
+            ),
+          );
+          _estaDigitando = false;
+        });
+        await _salvarHistoricoConversa();
         _rolarParaBaixo();
       }
-    });
+    }
   }
 
   @override
