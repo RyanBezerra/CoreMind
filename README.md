@@ -157,7 +157,7 @@ Como testar
 ### 1. Clonar o repositório
 
 ```bash
-git clone "https://github.com/otav-io/GeradorDeSenhasApp.git"
-cd GeradorDeSenhasApp
+git clone "https://github.com/RyanBezerra/CoreMind.git"
+cd CoreMind
 
 ---
