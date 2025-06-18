@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'tela_conversa.dart';
+import 'models/usuario.dart';
 
 class TelaAssistente extends StatefulWidget {
-  const TelaAssistente({super.key});
+  final Usuario usuario;
+
+  const TelaAssistente({
+    super.key,
+    required this.usuario,
+  });
 
   @override
   State<TelaAssistente> createState() => _TelaAssistenteState();
@@ -103,7 +109,7 @@ class _TelaAssistenteState extends State<TelaAssistente> with SingleTickerProvid
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const TelaConversa(),
+              builder: (context) => TelaConversa(usuario: widget.usuario),
             ),
           );
         },

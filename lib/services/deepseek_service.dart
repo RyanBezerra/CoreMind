@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../tela_conversa.dart';
+import '../models/mensagem.dart';
 
 class DeepSeekService {
   static const String _baseUrl = 'https://openrouter.ai/api/v1';
-  static const String _apiKey = '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';
+  static const String _apiKey = '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';
 
   Future<String> sendMessage(String message, List<Mensagem> historico) async {
     try {
@@ -33,16 +33,7 @@ class DeepSeekService {
         },
         body: jsonEncode({
           'model': 'deepseek/deepseek-chat-v3-0324:free',
-          'messages': [
-            {
-              'role': 'system',
-              'content': 'Responda sempre em português, a menos que o usuário peça para responder em outro idioma.'
-            },
-            {
-              'role': 'user',
-              'content': message,
-            }
-          ],
+          'messages': mensagens,
           'temperature': 0.7,
           'max_tokens': 1000,
         }),
@@ -57,7 +48,12 @@ class DeepSeekService {
         throw Exception('Erro na requisição: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Erro ao enviar mensagem: $e');
+      print('Erro ao enviar mensagem: $e');
+      rethrow;
     }
+  }
+
+  Future<void> limparConversasVazias(int usuarioId) async {
+    // Implemente a lógica para limpar conversas vazias
   }
 } 
