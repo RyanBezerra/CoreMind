@@ -148,7 +148,6 @@ Como testar
 - [Matheus Farias](https://github.com/Matheusota2k)
 - [Otavio Fernando](https://github.com/otav-io)
 - [Luiz Ramalho](https://github.com/luizmont5)
-- [Lauro Oliveira](https://github.com/L4ur-o) 
 
 ---
 
